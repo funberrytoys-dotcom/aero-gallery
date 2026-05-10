@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AERO — 3D Фотогалерея</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: rgba(255,255,255,0.03);
+      --surface-hover: rgba(255,255,255,0.06);
+      --border: rgba(255,255,255,0.08);
+      --text: #f5f5f7;
+      --text2: #86868b;
+      --accent: #ff375f;
+      --accent2: #32d74b;
+      --shadow: rgba(0,0,0,0.6);
+    }
+    .light {
+      --bg: #f5f5f7;
+      --surface: rgba(0,0,0,0.03);
+      --surface-hover: rgba(0,0,0,0.06);
+      --border: rgba(0,0,0,0.08);
+      --text: #1d1d1f;
+      --text2: #86868b;
+      --shadow: rgba(0,0,0,0.15);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      transition: background 0.4s;
+    }
+    /* Bold display font */
+    h1, h2, .brand, .photo-title {
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    </style>
+</head>
+<body>
+<script>
+// Демо-фотографии (placeholder)
+const PHOTOS = [
+  { id: 1, title: 'Токио Ночь', src: 'https://picsum.photos/seed/tokyo/600/800', likes: 124, liked: false },
+  { id: 2, title: 'Париж Дождь', src: 'https://picsum.photos/seed/paris/600/800', likes: 89, liked: false },
+  { id: 3, title: 'Нью-Йорк Свет', src: 'https://picsum.photos/seed/nyc/600/800', likes: 256, liked: false },
+  { id: 4, title: 'Рейкьявик Лед', src: 'https://picsum.photos/seed/ice/600/800', likes: 67, liked: false },
+  { id: 5, title: 'Киото Сакура', src: 'https://picsum.photos/seed/kyoto/600/800', likes: 312, liked: false },
+  { id: 6, title: 'Лондон Туман', src: 'https://picsum.photos/seed/london/600/800', likes: 145, liked: false },
+  { id: 7, title: 'Дубай Пустыня', src: 'https://picsum.photos/seed/dubai/600/800', likes: 198, liked: false },
+  { id: 8, title: 'Рио Закат', src: 'https://picsum.photos/seed/rio/600/800', likes: 230, liked: false },
+];
+
+let current = 0;
+let favorites = JSON.parse(localStorage.getItem('aero_fav') || '[]');
+let theme = localStorage.getItem('aero_theme') || 'dark';
+
+// Init
+if (theme === 'light') document.body.classList.add('light');
+
+// Hash routing
+if (location.hash) {
+  const id = parseInt(location.hash.replace('#photo-', ''));
+  const idx = PHOTOS.findIndex(p => p.id === id);
+  if (idx >= 0) current = idx;
+}
+
+function render() {
+  document.body.innerHTML = `
+    <div style="position:fixed;top:0;left:0;right:0;z-index:100;padding:20px 30px;display:flex;justify-content:space-between;align-items:center;">
+      <div class="brand" style="font-size:2rem;color:var(--text);">🔥 AERO</div>
+      <div style="display:flex;gap:12px;">
+        <button onclick="toggleFavView()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:20px;cursor:pointer;font-weight:600;">⭐ Избранное (${favorites.length})</button>
+        <button onclick="toggleTheme()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:20px;cursor:pointer;font-weight:600;">${theme==='dark'?'☀️':'🌙'}</button>
+      </div>
+    </div>
+
+    <div class="gallery" id="gallery" style="height:100vh;display:flex;align-items:center;justify-content:center;perspective:1200px;overflow:hidden;">
+      ${PHOTOS.map((p,i) => {
+        const offset = i - current;
+        const isCenter = offset === 0;
+        const rotateY = offset * -35;
+        const translateZ = isCenter ? 120 : -200;
+        const translateX = offset * 320;
+        const opacity = Math.abs(offset) > 2 ? 0 : 1;
+        const scale = isCenter ? 1.15 : 0.85;
+        const blur = isCenter ? 0 : 3;
+        return `
+          <div class="card ${isCenter?'active':''}" data-idx="${i}"
+            style="
+              position:absolute;
+              width:280px;height:420px;
+              transform: translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale});
+              opacity:${opacity};
+              filter:blur(${blur}px);
+              transition:all 0.6s cubic-bezier(0.25,0.46,0.45,0.94);
+              transform-style:preserve-3d;
+              cursor:pointer;
+              border-radius:24px;
+              overflow:hidden;
+              background:var(--surface);
+              border:1px solid var(--border);
+              box-shadow:0 25px 50px var(--shadow);
+            "
+            onclick="goTo(${i})"
+          >
+            <img src="${p.src}" style="width:100%;height:75%;object-fit:cover;display:block;">
+            <div style="padding:16px;">
+              <div class="photo-title" style="font-size:1.4rem;color:var(--text);margin-bottom:8px;">${p.title}</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <button onclick="event.stopPropagation();toggleLike(${p.id})" style="background:none;border:none;cursor:pointer;font-size:1.3rem;">${p.liked ? '❤️' : '🤍'} ${p.likes}</button>
+                <button onclick="event.stopPropagation();toggleFav(${p.id})" style="background:none;border:none;cursor:pointer;font-size:1.3rem;">${favorites.includes(p.id) ? '⭐' : '☆'}</button>
+                <button onclick="event.stopPropagation();share(${p.id})" style="background:none;border:none;cursor:pointer;font-size:1.2rem;">🔗</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+
+    <div style="position:fixed;bottom:0;left:0;right:0;padding:30px;display:flex;justify-content:center;gap:40px;z-index:100;">
+      <button onclick="prev()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);width:60px;height:60px;border-radius:50%;font-size:1.5rem;cursor:pointer;backdrop-filter:blur(20px);">←</button>
+      <div style="text-align:center;">
+        <div class="photo-title" style="font-size:1.2rem;color:var(--text2);">${current+1} / ${PHOTOS.length}</div>
+        <div style="font-size:0.8rem;color:var(--text2);margin-top:4px;">${PHOTOS[current].title}</div>
+      </div>
+      <button onclick="next()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);width:60px;height:60px;border-radius:50%;font-size:1.5rem;cursor:pointer;backdrop-filter:blur(20px);">→</button>
+    </div>
+
+    <div id="toast" style="position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-100px);background:var(--surface);border:1px solid var(--border);padding:12px 24px;border-radius:16px;color:var(--text);font-weight:600;z-index:200;transition:transform 0.3s;backdrop-filter:blur(20px);"></div>
+  `;
+  updateHash();
+}
+
+function goTo(i) {
+  if (i === current) return;
+  current = Math.max(0, Math.min(i, PHOTOS.length - 1));
+  render();
+}
+
+function next() { goTo(current + 1); }
+function prev() { goTo(current - 1); }
+
+function toggleLike(id) {
+  const p = PHOTOS.find(x => x.id === id);
+  p.liked = !p.liked;
+  p.likes += p.liked ? 1 : -1;
+  showToast(p.liked ? '❤️ Лайк!' : '💔 Лайк снят');
+  render();
+}
+
+function toggleFav(id) {
+  if (favorites.includes(id)) {
+    favorites = favorites.filter(x => x !== id);
+    showToast('☆ Убрано из избранного');
+  } else {
+    favorites.push(id);
+    showToast('⭐ В избранном');
+  }
+  localStorage.setItem('aero_fav', JSON.stringify(favorites));
+  render();
+}
+
+function toggleFavView() {
+  const favPhotos = PHOTOS.filter(p => favorites.includes(p.id));
+  if (favPhotos.length === 0) {
+    showToast('⭐ Избранное пусто');
+    return;
+  }
+  alert('Избранные фото:\n' + favPhotos.map(p => p.title).join('\n'));
+}
+
+function toggleTheme() {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('aero_theme', theme);
+  document.body.classList.toggle('light', theme === 'light');
+  render();
+}
+
+function share(id) {
+  const url = location.origin + location.pathname + '#photo-' + id;
+  navigator.clipboard?.writeText(url).then(() => showToast('🔗 Ссылка скопирована!'));
+  if (!navigator.clipboard) {
+    prompt('Скопируй ссылку:', url);
+  }
+}
+
+function updateHash() {
+  history.replaceState(null, null, '#photo-' + PHOTOS[current].id);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  setTimeout(() => t.style.transform = 'translateX(-50%) translateY(-100px)', 2000);
+}
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') next();
+  if (e.key === 'ArrowLeft') prev();
+});
+
+// Touch
+let touchStartX = 0;
+document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; });
+document.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 50) {
+    dx < 0 ? next() : prev();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
